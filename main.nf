@@ -33,17 +33,16 @@ def helpText() {
     """.stripIndent()
 }
 
-// Gives each sample its own copy of the reference, ref.fa, so that no two samples share files,
-// and indexes it: for bowtie2 (ref.*.bt2) and for variant calling (ref.fa.fai)
+// Copies the reference as ref.fa and indexes it: for bowtie2 (ref.*.bt2) and for variant calling
+// (ref.fa.fai)
 process PREP_REF {
     label 'process_single'
-    tag "${sample}"
 
     input:
-    tuple val(sample), path(fasta, stageAs: 'input.fa')
+    path fasta, stageAs: 'input.fa'
 
     output:
-    tuple val(sample), path('ref*'), emit: ref
+    path 'ref*', emit: ref
 
     script:
     """
@@ -53,14 +52,14 @@ process PREP_REF {
     """
 }
 
-// Aligns one sample's reads to that sample's copy of the reference and sorts the alignments by
-// position
+// Aligns one sample's reads and sorts the alignments by position
 process ALIGN {
     label 'process_single'
     tag "${sample}"
 
     input:
-    tuple val(sample), path(fastq), path(reference)
+    tuple val(sample), path(fastq)
+    path reference
 
     output:
     path "${sample}.bam", emit: bams
@@ -152,10 +151,8 @@ workflow {
             tuple(row.sample, fastq)
         }
 
-    // One copy of the reference per sample, then each sample's reads with its own copy
-    PREP_REF(reads.map { sample, fastq -> tuple(sample, file(params.fasta)) })
-    ALIGN(reads.join(PREP_REF.out.ref))
-    // Variant calling needs only one copy: any sample's will do
-    CALL(ALIGN.out.bams.collect(), ALIGN.out.bais.collect(), PREP_REF.out.ref.first().map { sample, reference -> reference })
+    PREP_REF(file(params.fasta))
+    ALIGN(reads, PREP_REF.out.ref)
+    CALL(ALIGN.out.bams.collect(), ALIGN.out.bais.collect(), PREP_REF.out.ref)
     ASSOC(CALL.out.vcf, file(params.phenotypes))
 }
