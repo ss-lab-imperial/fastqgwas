@@ -1,0 +1,11 @@
+work/
+.nextflow/
+.nextflow.log*
+test_results/
+test_out/
+nf_out/
+.DS_Store
+*.Rproj
+.Rproj.user/
+.Rhistory
+.RData
