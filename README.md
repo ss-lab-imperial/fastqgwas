@@ -6,7 +6,7 @@ case/control status.
 
 ## Quick start
 
-On Imperial's HPC, 
+On Imperial's HPC, load Nextflow and run the workflow with
 
 ```bash
 module load Nextflow
