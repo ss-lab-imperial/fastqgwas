@@ -33,47 +33,45 @@ def helpText() {
     """.stripIndent()
 }
 
-// Copies the reference as ref.fa and indexes it for variant calling (ref.fa.fai)
+// Gives each sample its own copy of the reference, ref.fa, so that no two samples share files,
+// and indexes it: for bowtie2 (ref.*.bt2) and for variant calling (ref.fa.fai)
 process PREP_REF {
     label 'process_single'
+    tag "${sample}"
 
     input:
-    path fasta, stageAs: 'input.fa'
+    tuple val(sample), path(fasta, stageAs: 'input.fa')
 
     output:
-    path 'ref.fa*', emit: ref
+    tuple val(sample), path('ref*'), emit: ref
 
     script:
     """
     cp input.fa ref.fa
+    bowtie2-build --quiet --threads ${task.cpus} ref.fa ref
     samtools faidx ref.fa
     """
 }
 
-// Aligns the reads and sorts the alignments by position. All samples are aligned in one task,
-// so they share one working folder. bowtie2 searches an index of the reference (ref.*.bt2), built
-// from ref.fa before each sample so that every alignment starts from a fresh index.
+// Aligns one sample's reads to that sample's copy of the reference and sorts the alignments by
+// position
 process ALIGN {
     label 'process_single'
+    tag "${sample}"
 
     input:
-    path fastqs
-    path reference
+    tuple val(sample), path(fastq), path(reference)
 
     output:
-    path '*.bam', emit: bams
-    path '*.bam.bai', emit: bais
+    path "${sample}.bam", emit: bams
+    path "${sample}.bam.bai", emit: bais
 
     script:
     """
     set -o pipefail
-    for fq in ${fastqs}; do
-        sample=\$(basename "\$fq" .fastq.gz)
-        bowtie2-build --quiet --threads ${task.cpus} ref.fa ref
-        bowtie2 -p ${task.cpus} -u ${params.max_reads} -x ref -U "\$fq" --rg-id "\$sample" --rg "SM:\$sample" 2> "\$sample.log" \
-            | samtools sort -o "\$sample.bam"
-        samtools index "\$sample.bam"
-    done
+    bowtie2 -p ${task.cpus} -u ${params.max_reads} -x ref -U ${fastq} --rg-id ${sample} --rg SM:${sample} 2> ${sample}.log \\
+        | samtools sort -o ${sample}.bam
+    samtools index ${sample}.bam
     """
 }
 
@@ -151,11 +149,13 @@ workflow {
             if (!fastq.exists()) {
                 error "Sample ${row.sample}: no FASTQ file at ${fastq}. Relative paths in the samplesheet are read from the samplesheet's folder (${sheet.parent}), not from where you run nextflow"
             }
-            fastq
+            tuple(row.sample, fastq)
         }
 
-    PREP_REF(file(params.fasta))
-    ALIGN(reads.collect(), PREP_REF.out.ref)
-    CALL(ALIGN.out.bams, ALIGN.out.bais, PREP_REF.out.ref)
+    // One copy of the reference per sample, then each sample's reads with its own copy
+    PREP_REF(reads.map { sample, fastq -> tuple(sample, file(params.fasta)) })
+    ALIGN(reads.join(PREP_REF.out.ref))
+    // Variant calling needs only one copy: any sample's will do
+    CALL(ALIGN.out.bams.collect(), ALIGN.out.bais.collect(), PREP_REF.out.ref.first().map { sample, reference -> reference })
     ASSOC(CALL.out.vcf, file(params.phenotypes))
 }
