@@ -47,7 +47,7 @@ process PREP_REF {
     script:
     """
     cp input.fa ref.fa
-    bowtie2-build --quiet --threads ${task.cpus} ref.fa ref
+    bwa index ref.fa
     samtools faidx ref.fa
     """
 }
@@ -68,7 +68,8 @@ process ALIGN {
     script:
     """
     set -o pipefail
-    bowtie2 -p ${task.cpus} -u ${params.max_reads} -x ref -U ${fastq} --rg-id ${sample} --rg SM:${sample} 2> ${sample}.log \\
+    zcat ${fastq} | head -n \$(( 4 * ${params.max_reads} )) > first_reads.fq
+    bwa mem -t ${task.cpus} -R '@RG\\tID:${sample}\\tSM:${sample}' ref.fa first_reads.fq 2> ${sample}.log \\
         | samtools sort -o ${sample}.bam
     samtools index ${sample}.bam
     """
