@@ -10,7 +10,7 @@ On Imperial's HPC, load Nextflow and run the workflow with
 
 ```bash
 module load Nextflow
-nextflow run ss-lab-imperial/fastqgwas -r 1.0.0 -profile imperial \
+nextflow run ss-lab-imperial/fastqgwas -r <release> -profile imperial \
     --outdir nf_out \
     --input samplesheet.csv \
     -params-file gwas.yml \
@@ -18,7 +18,7 @@ nextflow run ss-lab-imperial/fastqgwas -r 1.0.0 -profile imperial \
     -resume
 ```
 
-with `gwas.yml` holding the other inputs:
+where `<release>` is the release you want to run (see the repository's Releases), and `gwas.yml` holds the other inputs:
 
 ```yaml
 fasta: <path_to_your_data>/ref.fa
@@ -28,7 +28,7 @@ phenotypes: <path_to_your_data>/phenotypes.tsv
 To try it on the small test dataset in `test_data/` first:
 
 ```bash
-nextflow run ss-lab-imperial/fastqgwas -r 1.0.0 -profile test,imperial --outdir test_out
+nextflow run ss-lab-imperial/fastqgwas -r <release> -profile test,imperial --outdir test_out
 ```
 
 (`-profile test` supplies `--input` and the `-params-file` inputs; `--outdir` is always needed.)
