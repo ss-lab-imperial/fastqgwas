@@ -68,3 +68,4 @@ Tools come from containers (the images nf-core's own modules use), which `-profi
   - `execution_report_*.html`: summary of the run, with resource use per step
   - `execution_timeline_*.html`: when each task started and finished
   - `pipeline_dag_*.html`: diagram of the steps
+
